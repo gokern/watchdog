@@ -5,7 +5,7 @@ go 1.26
 replace github.com/gokern/watchdog => ..
 
 require (
-	github.com/gokern/watchdog v0.0.0-00010101000000-000000000000
+	github.com/gokern/watchdog v0.1.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/stretchr/testify v1.11.1
 )

@@ -46,8 +46,9 @@ linters:
         - ch chan<- *prometheus.Desc
   exclusions:
     rules:
-      # The replace directive points the collector at the watchdog beside it,
-      # so the two move together until the core is tagged.
+      # The replace points the collector at the watchdog beside it, so the two
+      # move together here. Consumers ignore it and resolve the require, which
+      # names a published version; make release-check compiles that pair.
       - path: go\.mod
         linters:
           - gomoddirectives
