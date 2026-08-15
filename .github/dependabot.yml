@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      go-modules:
+        patterns: ["*"]
+
+  # An entry of its own, because Dependabot reads one go.mod per directory and
+  # the root entry never sees this one. Without it client_golang and the ten
+  # packages it brings — the whole third-party surface of this repo, since the
+  # core module has none outside its tests — get no update pull requests, and
+  # govulncheck eventually reports a CVE that nothing opens a PR to fix.
+  #
+  # Spelled as a second entry rather than with the newer `directories:` list,
+  # which nothing in this repo can check: a config key that turns out not to
+  # exist fails silently in a service nobody runs locally, and two entries are
+  # correct on every version of Dependabot there has ever been.
+  - package-ecosystem: gomod
+    directory: /watchdogprom
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      go-modules:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]

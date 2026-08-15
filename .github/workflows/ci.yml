@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, ${{ matrix.module.name }})
+    runs-on: ${{ matrix.os }}
+
+    # Two axes, and both earn their jobs.
+    #
+    # The operating system, because this package is a clock and a memory
+    # layout: it reads the monotonic clock on every proof and pads its slots to
+    # a cache line. The suite asserts on both, and a timing assumption that
+    # only holds on Linux would be found by an adopter rather than here.
+    #
+    # The module, because every Go tool stops at a module boundary: ./... at
+    # the root never enters watchdogprom, which is the whole reason that module
+    # exists — the core carries no metrics client in its build graph.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        module:
+          - { dir: ".", name: "watchdog" }
+          - { dir: "watchdogprom", name: "watchdogprom" }
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ matrix.module.dir }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ matrix.module.dir }}/go.mod
+          check-latest: true
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # Shuffled because every test here is parallel and several assert on real
+      # elapsed time. A fixed order is one arrangement of that, not a statement
+      # about any other.
+      - name: Test with race and coverage
+        run: go test -race -shuffle=on -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Report coverage
+        run: go tool cover -func=coverage.out | tail -1
+
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          # Artifact names are unique per run and both modules produce one.
+          name: coverage-${{ matrix.module.name }}
+          # Not subject to the working-directory default above, so it carries
+          # the module directory itself.
+          path: ${{ matrix.module.dir }}/coverage.out
+          if-no-files-found: error

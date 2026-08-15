@@ -1,0 +1,72 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+formatters:
+  enable:
+    - gci
+    - golines
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+    gofmt:
+      rewrite-rules:
+        - pattern: "interface{}"
+          replacement: "any"
+        - pattern: "a[b:len(a)]"
+          replacement: "a[b:]"
+
+linters:
+  default: all
+  disable:
+    - wsl # Deprecated, replaced by wsl_v5.
+    - gomodguard # Deprecated, replaced by gomodguard_v2.
+  settings:
+    depguard:
+      rules:
+        main:
+          allow:
+            - $gostd
+            - github.com/gokern/watchdog
+            - github.com/stretchr/testify
+            - go.uber.org/goleak
+    exhaustruct:
+      # Status stays checked on purpose: it is the diagnostic surface, and a
+      # field added to it must be answered in status(). The three below are
+      # exempt because their zero values are load-bearing.
+      exclude:
+        # slot appears only inside unsafe.Sizeof, which constructs nothing, and
+        # its padding field cannot be named in a literal at all.
+        - '^github\.com/gokern/watchdog\.slot$'
+        # An unset predicate, an undeclared Concurrency and a nil slot array
+        # each mean something; naming them would say the opposite.
+        - '^github\.com/gokern/watchdog\.Track$'
+        # Zero values for a mutex and an atomic are the correct ones, and
+        # spelling them out would only invite someone to copy the struct.
+        - '^github\.com/gokern/watchdog\.Watchdog$'
+    varnamelen:
+      # Short names are allowed where the type says what the value is. Anything
+      # whose type does not carry that weight gets a full name in the code.
+      ignore-decls:
+        - t *Track
+        - t *testing.T
+        - w *watchdog.Watchdog
+        - s Status
+        - s watchdog.Status
+        - wg sync.WaitGroup
+        - fn func()
+  exclusions:
+    rules:
+      # A table of subtests is one function to the linter and a list to a
+      # reader; splitting it to satisfy a line count would read worse. And
+      # export_test.go exists to hand an unexported symbol to the external
+      # test package, which is a global by construction.
+      - path: _test\.go
+        linters:
+          - funlen
+          - gochecknoglobals

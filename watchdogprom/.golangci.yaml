@@ -1,0 +1,67 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+formatters:
+  enable:
+    - gci
+    - golines
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+    gofmt:
+      rewrite-rules:
+        - pattern: "interface{}"
+          replacement: "any"
+        - pattern: "a[b:len(a)]"
+          replacement: "a[b:]"
+
+linters:
+  default: all
+  disable:
+    - wsl # Deprecated, replaced by wsl_v5.
+    - gomodguard # Deprecated, replaced by gomodguard_v2.
+  settings:
+    depguard:
+      rules:
+        main:
+          allow:
+            - $gostd
+            - github.com/gokern/watchdog
+            - github.com/prometheus/client_golang
+            - github.com/stretchr/testify
+    varnamelen:
+      # Short names are allowed where the type says what the value is. Anything
+      # whose type does not carry that weight gets a full name in the code.
+      ignore-decls:
+        - t *testing.T
+        - w *watchdog.Watchdog
+        - s watchdog.Status
+        - ch chan<- prometheus.Metric
+        - ch chan<- *prometheus.Desc
+  exclusions:
+    rules:
+      # The replace directive points the collector at the watchdog beside it,
+      # so the two move together until the core is tagged.
+      - path: go\.mod
+        linters:
+          - gomoddirectives
+        text: "local replacement"
+      # A test builds the error it is asserting on, and repeats a track name
+      # across cases because inline reads better than a constant.
+      - path: _test\.go
+        linters:
+          - err113
+          - goconst
+      # A table of subtests is one function to the linter and a list to a
+      # reader; splitting it to satisfy a line count would read worse. The
+      # globals are fixtures shared by the cases in one file.
+      - path: _test\.go
+        linters:
+          - funlen
+          - gochecknoglobals
