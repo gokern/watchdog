@@ -186,16 +186,29 @@ that opens and closes between two scrapes leaves no trace anywhere except `PeakS
 
 ## Wiring it to a probe
 
-`Live()` is a plain predicate. Hand it to whatever serves your endpoint:
+`Live()` is a plain predicate, so a probe library that takes one needs no adapter.
+[`probez`](https://github.com/gokern/probez) does, from v0.2.0 onwards:
 
 ```go
-// A probe library that accepts a predicate takes w.Live as it is, with no
-// adapter and no second window of its own.
-probeServer.SetLivenessCheck(w.Live)
+w := watchdog.New()
+w.Track("invoice_consumer", watchdog.MaxSilence(45*time.Second))
+w.Arm()
+
+if err := probez.Start(8002,
+    probez.WithAutoLive(),
+    probez.WithLivenessCheck("watchdog", w.Live),
+); err != nil {
+    log.Fatal(err)
+}
+probez.MarkStarted()
 ```
 
-If your probe library only offers a heartbeat you have to ping, do **not** ping it from a
-loop that also checks `Live()`. That is the double-window trap:
+`WithAutoLive()` is what keeps the chain to one window. Without it probez holds its own
+heartbeat in the same AND, and a process that never calls `Ping()` goes 503 once the startup
+grace runs out, whatever the watchdog knows.
+
+That trap is not specific to one library. If yours only offers a heartbeat you have to ping,
+do **not** ping it from a loop that also checks `Live()`:
 
 ```
   strand wedges
