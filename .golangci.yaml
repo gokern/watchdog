@@ -26,6 +26,7 @@ linters:
   disable:
     - wsl # Deprecated, replaced by wsl_v5.
     - gomodguard # Deprecated, replaced by gomodguard_v2.
+    - exhaustruct # Deprecated, replaced by exhaustruct_v5.
   settings:
     depguard:
       rules:
@@ -35,11 +36,11 @@ linters:
             - github.com/gokern/watchdog
             - github.com/stretchr/testify
             - go.uber.org/goleak
-    exhaustruct:
+    exhaustruct_v5:
       # Status stays checked on purpose: it is the diagnostic surface, and a
       # field added to it must be answered in status(). The three below are
       # exempt because their zero values are load-bearing.
-      exclude:
+      ignore-patterns:
         # slot appears only inside unsafe.Sizeof, which constructs nothing, and
         # its padding field cannot be named in a literal at all.
         - '^github\.com/gokern/watchdog\.slot$'
