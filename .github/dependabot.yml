@@ -1,26 +1,24 @@
 version: 2
 updates:
-  - package-ecosystem: gomod
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      go-modules:
-        patterns: ["*"]
-
-  # An entry of its own, because Dependabot reads one go.mod per directory and
-  # the root entry never sees this one. Without it client_golang and the ten
-  # packages it brings — the whole third-party surface of this repo, since the
-  # core module has none outside its tests — get no update pull requests, and
-  # govulncheck eventually reports a CVE that nothing opens a PR to fix.
+  # One entry for both modules, because Dependabot reads one go.mod per
+  # directory and an entry for the root alone never sees watchdogprom. Without
+  # it client_golang and the ten packages it brings — the whole third-party
+  # surface of this repo, since the core module has none outside its tests —
+  # get no update pull requests, and govulncheck eventually reports a CVE that
+  # nothing opens a PR to fix.
   #
-  # Spelled as a second entry rather than with the newer `directories:` list,
-  # which nothing in this repo can check: a config key that turns out not to
-  # exist fails silently in a service nobody runs locally, and two entries are
-  # correct on every version of Dependabot there has ever been.
+  # The two directories are listed together rather than as two entries, which
+  # is how this file was first written. watchdogprom replaces the root with
+  # `..`, so a bump in the root go.mod changes what watchdogprom's go.sum has
+  # to hold, and a pull request that touches one directory leaves the other
+  # untidy and its CI red (#2 was the first). One grouped update bumps and
+  # tidies both directories in the same pull request. That holds as long as
+  # watchdogprom keeps requiring every dependency it shares with the root
+  # directly, as its go.mod does today with testify. goleak is the one
+  # exception: only the root's tests use it, yet watchdogprom's go.sum records
+  # it, so a bump of goleak alone still needs a tidy in watchdogprom by hand.
   - package-ecosystem: gomod
-    directory: /watchdogprom
+    directories: ["/", "/watchdogprom"]
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
