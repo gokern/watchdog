@@ -1,0 +1,84 @@
+# watchdog — local development tooling.
+#
+# Two modules live here: the root, whose only dependencies are its test ones,
+# and watchdogprom, which carries client_golang. Every Go tool stops at a
+# module boundary, so each multi-module task below runs twice rather than
+# relying on ./... to descend into the nested one. It does not.
+#
+# The Go version is deliberately not pinned here: go.mod already declares the
+# minimum supported version and CI reads it. Bump [tools] by hand — Dependabot
+# does not read this file.
+
+[tools]
+golangci-lint = "2.14.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.8.0"
+
+# Shuffled on purpose: every test here calls t.Parallel and several assert on
+# real elapsed time, so a fixed order is one arrangement of that rather than a
+# statement about any other. GO_TEST overrides the runner, e.g. to raise
+# -parallel: the waiting tests are bound by the server's connection limit,
+# not the CPU. It runs through
+# sh -ec so a quoted GO_TEST ("-run '^TestX$'") parses the way it reads;
+# unquoted expansion would pass the quotes into the regex. POSIX shell only —
+# these tasks never run on Windows: CI bypasses mise there (raw go per
+# module), and this repo has no other Windows path into them.
+[tasks.test]
+description = "Run both modules' tests with the race detector"
+run = '''
+: "${GO_TEST:=go test -race -shuffle=on}"
+sh -ec "$GO_TEST -covermode=atomic -coverprofile=coverage.out ./..."
+cd watchdogprom && sh -ec "$GO_TEST -covermode=atomic -coverprofile=coverage.out ./..."
+'''
+
+[tasks.lint]
+description = "Run golangci-lint over both modules"
+run = [
+  "golangci-lint run ./...",
+  "cd watchdogprom && golangci-lint run ./...",
+]
+
+[tasks.fmt]
+description = "Apply the formatters configured in .golangci.yaml, in both modules"
+run = [
+  "golangci-lint fmt ./...",
+  "cd watchdogprom && golangci-lint fmt ./...",
+]
+
+[tasks.tidy]
+description = "Check both go.mod files are tidy"
+# -diff is non-mutating and independent of the commit state: it exits
+# non-zero exactly when a tidy would change something.
+run = [
+  "go mod tidy -diff",
+  "cd watchdogprom && go mod tidy -diff",
+]
+
+[tasks.vuln]
+description = "Scan both modules for known vulnerabilities"
+run = [
+  "govulncheck ./...",
+  "cd watchdogprom && govulncheck ./...",
+]
+
+# The combination the replace hides (see outboxer's identical target): nothing
+# else compiles watchdogprom against the published root its require names.
+[tasks.release-check]
+description = "Build watchdogprom against the published root its go.mod requires"
+run = '''
+ver=$(cd watchdogprom && go list -m github.com/gokern/watchdog | awk '{print $2}')
+test -n "$ver" || { echo "watchdogprom has no require for github.com/gokern/watchdog"; exit 1; }
+echo "building watchdogprom against the published github.com/gokern/watchdog $ver"
+tmp=$(mktemp -d) && trap 'rm -rf "$tmp"' EXIT || exit 1
+cp -R watchdogprom/. "$tmp" && cd "$tmp" || exit 1
+go mod edit -dropreplace=github.com/gokern/watchdog
+export GOFLAGS=-mod=mod
+go build ./... && go vet ./... && go test -race ./...
+'''
+
+[tasks.check]
+description = "Everything CI runs before merge"
+# Sequential, not `depends`: mise runs dependencies in parallel, and a
+# suite that asserts on real elapsed time should not compete with lint and
+# govulncheck for the CPU. tidy runs before test so an untidy module fails
+# fast instead of after the slowest check.
+run = "mise run lint && mise run tidy && mise run test && mise run vuln"
