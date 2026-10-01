@@ -386,7 +386,7 @@ is the `require`, so it has to name a root version that already exists:
 2. `cd watchdogprom && go mod edit -require=github.com/gokern/watchdog@vX.Y.Z`, and commit;
 3. tag `watchdogprom/vX.Y.Z` on that commit.
 
-`make release-check` is what proves the result: it builds `watchdogprom` with the `replace`
+`mise run release-check` is what proves the result: it builds `watchdogprom` with the `replace`
 dropped, which is the only combination an adopter ever compiles and the one every other
 check here hides. Treat the require as a floor rather than a pin — under minimal version
 selection a consumer already on a newer root keeps it, so it moves only when `watchdogprom`
